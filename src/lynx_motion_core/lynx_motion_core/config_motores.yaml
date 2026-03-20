@@ -1,0 +1,30 @@
+dimensiones_brazo:
+  L1: 70.0  
+  L2: 146.0 
+  L3: 181.0 
+
+articulaciones:
+  joint_base_rotate:
+    canal: 0
+    offset_grados: 0  
+    invertido: false
+  joint_shoulder:
+    canal: 1
+    offset_grados: 0  
+    invertido: true
+  joint_elbow:
+    canal: 2
+    offset_grados: 0  
+    invertido: false
+  joint_wrist:
+    canal: 3
+    offset_grados: 0  
+    invertido: false
+  joint_gripper_rotate:
+    canal: 4
+    offset_grados: 0
+    invertido: false
+  joint_gripper_finger:
+    canal: 5
+    offset_grados: 0
+    invertido: false

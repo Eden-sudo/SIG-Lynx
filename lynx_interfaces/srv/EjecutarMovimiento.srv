@@ -1,0 +1,4 @@
+string matriz_espacial_json
+---
+bool success
+string error_message

@@ -1,0 +1,6 @@
+string image_path
+int32 script_id
+---
+bool success
+string error_message
+string trajectories_json

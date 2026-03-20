@@ -1,0 +1,10 @@
+string rutas_json
+string config_espacio_json
+int32 w_img
+int32 h_img
+float32 delta_paso
+---
+bool success
+string error_message
+string matriz_espacial_json
+string formulas_matematicas_json
