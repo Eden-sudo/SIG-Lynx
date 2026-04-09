@@ -27,6 +27,7 @@ setup(
             'vision_service = lynx_motion_core.vision_service:main',
             'calculus_service = lynx_motion_core.calculus_service:main',
             'motion_service = lynx_motion_core.motion_service:main',
+            'rviz_animator = lynx_motion_core.rviz_animator:main',
         ],
     },
 )

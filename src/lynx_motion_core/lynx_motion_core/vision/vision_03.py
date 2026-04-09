@@ -1,94 +1,107 @@
 import cv2
 import numpy as np
 import time
-from scipy.interpolate import splprep, splev
 
 def nothing(x): pass
 
 # ==========================================
-# BLOQUE 1: FUNCIONES MATEMÁTICAS Y DE VISIÓN
+# BLOQUE 1: FUNCIONES MATEMÁTICAS (LOW-POLY)
 # ==========================================
-def suavizar_contorno_spline(contour, suavidad=0.0):
+def aproximar_poligono(contour, factor_rigidez):
     """
-    Convierte un contorno rugoso en una curva B-Spline suave.
-    Retorna directamente una lista de tuplas (x, y) estandarizada.
+    Convierte un contorno en un polígono de líneas rectas.
+    A mayor factor de rigidez, menos puntos y líneas más rectas.
     """
-    pts = [tuple(p[0]) for p in contour]
-    unique_pts = [pts[0]]
-    for p in pts[1:]:
-        if p != unique_pts[-1]:
-            unique_pts.append(p)
+    # El factor epsilon define qué tan "recta" será la aproximación
+    # Lo mapeamos de un valor de UI (ej. 1-50) a un porcentaje matemático (0.001 - 0.05)
+    epsilon = (factor_rigidez / 1000.0) * cv2.arcLength(contour, False)
     
-    # Si hay muy pocos puntos, devolvemos el original
-    if len(unique_pts) < 4:
-        return [(int(p[0]), int(p[1])) for p in unique_pts]
-
-    x = [p[0] for p in unique_pts]
-    y = [p[1] for p in unique_pts]
-
-    try:
-        # Calcular la B-Spline
-        tck, u = splprep([x, y], s=suavidad, per=True)  
+    # Aproximar a polígono (False = líneas abiertas, no forzamos círculos cerrados)
+    approx = cv2.approxPolyDP(contour, epsilon, False)
+    
+    # Extraemos y estandarizamos las coordenadas
+    puntos_rectos = []
+    for p in approx:
+        puntos_rectos.append((int(p[0][0]), int(p[0][1])))
         
-        # Generar nuevos puntos suaves
-        u_new = np.linspace(u.min(), u.max(), len(unique_pts) * 5)
-        x_new, y_new = splev(u_new, tck, der=0)
+    return puntos_rectos
 
-        # Retornar formato estandarizado para el calculador
-        return [(int(x_new[i]), int(y_new[i])) for i in range(len(x_new))]
-        
-    except Exception as e:
-        # Fallback de seguridad si la matemática falla
-        return [(int(p[0]), int(p[1])) for p in unique_pts]
-
-def extraer_vectores_organicos(imagen_binaria, suavidad, min_len):
-    """
-    Motor de extracción para el look orgánico.
-    """
+def extraer_vectores_geometricos(imagen_binaria, rigidez, min_len):
+    """Motor de extracción para el look geométrico/industrial."""
     contornos, _ = cv2.findContours(imagen_binaria, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     
     rutas_extraidas = []
     for cnt in contornos:
         if cv2.arcLength(cnt, False) > min_len:
-            ruta_suave = suavizar_contorno_spline(cnt, suavidad)
-            rutas_extraidas.append(ruta_suave)
+            ruta_recta = aproximar_poligono(cnt, rigidez)
+            
+            # Filtramos para no enviar puntos solitarios
+            if len(ruta_recta) >= 2:
+                rutas_extraidas.append(ruta_recta)
             
     return rutas_extraidas
 
 # ==========================================
-# BLOQUE 2: MÓDULO EXPORTABLE (Caja Negra)
+# BLOQUE 2: LÓGICA PURA (ESTANDARIZADA)
 # ==========================================
-def obtener_trazos_organicos(usar_ui=True, cam_index=0):
+def procesar_frame(frame, config=None):
     """
-    Función principal. 
-    Retorna: (lista_de_coordenadas, imagen_generada_en_memoria)
+    Aplica la lógica visual Geométrica (Low-Poly).
+    Retorna EXACTAMENTE: rutas_finales, edges_cleaned
     """
-    
-    # --- VALORES POR DEFECTO ---
-    val_bloque = 11
-    val_c = 2
-    val_suavidad = 5
-    val_basura = 15
+    if config is None:
+        config = {
+            'bloque': 11, 'c': 2, 'rigidez': 15, 'basura': 15
+        }
 
-    win_name = 'Vision_Organica'
-    win_robot = 'Robot_Splines_Suaves'
+    val_bloque = config['bloque']
+    val_c = config['c']
+    val_rigidez = config['rigidez']
+    val_basura = config['basura']
+
+    if val_bloque % 2 == 0: val_bloque += 1
+    if val_bloque < 3: val_bloque = 3
+
+    # Preprocesamiento rápido (sin difuminados complejos)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    
+    edges = cv2.adaptiveThreshold(
+        gray, 255,   
+        cv2.ADAPTIVE_THRESH_MEAN_C,  # Usamos MEAN en lugar de GAUSSIAN para cortes más duros 
+        cv2.THRESH_BINARY,   
+        val_bloque,   
+        val_c
+    )
+    
+    edges_inv = cv2.bitwise_not(edges)
+    kernel = np.ones((2,2), np.uint8)
+    edges_cleaned = cv2.morphologyEx(edges_inv, cv2.MORPH_OPEN, kernel)
+
+    # Llamada al nuevo motor geométrico
+    rutas_finales = extraer_vectores_geometricos(edges_cleaned, val_rigidez, val_basura)
+
+    return rutas_finales, edges_cleaned
+
+# ==========================================
+# BLOQUE 3: CÁMARA Y UI STANDALONE
+# ==========================================
+def obtener_trazos_geometricos(usar_ui=True, cam_index=0):
+    """Prueba manual standalone"""
+    win_name = 'Vision_Geometrica_LowPoly'
+    win_robot = 'Robot_Trazos_Rectos'
 
     if usar_ui:
         cv2.namedWindow(win_name)
         cv2.namedWindow(win_robot)
-        
-        cv2.createTrackbar('Tamano_Bloque', win_name, val_bloque, 50, nothing)  
-        cv2.createTrackbar('Umbral_C', win_name, val_c, 20, nothing)
-        cv2.createTrackbar('Suavidad_Spline', win_name, val_suavidad, 50, nothing)  
-        cv2.createTrackbar('Filtro_Basura', win_name, val_basura, 100, nothing)
+        cv2.createTrackbar('Tamano_Bloque', win_name, 11, 50, nothing)   
+        cv2.createTrackbar('Umbral_C', win_name, 2, 20, nothing)
+        cv2.createTrackbar('Rigidez_Lineas', win_name, 15, 100, nothing)  # Sustituye a la suavidad
+        cv2.createTrackbar('Filtro_Basura', win_name, 15, 100, nothing)
 
     cap = cv2.VideoCapture(cam_index)
 
-    # WARMUP
     if not usar_ui:
-        for _ in range(10):
-            cap.read()
-            time.sleep(0.05)
+        for _ in range(10): cap.read(); time.sleep(0.05)
 
     rutas_finales = []
     imagen_final = None
@@ -98,77 +111,46 @@ def obtener_trazos_organicos(usar_ui=True, cam_index=0):
         if not ret: break
         
         h, w = frame.shape[:2]
+        frame = cv2.flip(frame, 1)
 
+        config = None
         if usar_ui:
-            val_bloque = cv2.getTrackbarPos('Tamano_Bloque', win_name)
-            val_c = cv2.getTrackbarPos('Umbral_C', win_name)
-            val_suavidad = cv2.getTrackbarPos('Suavidad_Spline', win_name) * 10 
-            val_basura = cv2.getTrackbarPos('Filtro_Basura', win_name)
-        else:
-            # Multiplicamos la suavidad estática como en tu código original
-            val_suavidad = val_suavidad * 10
+            config = {
+                'bloque': cv2.getTrackbarPos('Tamano_Bloque', win_name),
+                'c': cv2.getTrackbarPos('Umbral_C', win_name),
+                'rigidez': cv2.getTrackbarPos('Rigidez_Lineas', win_name),
+                'basura': cv2.getTrackbarPos('Filtro_Basura', win_name)
+            }
 
-        # Reglas matemáticas para el Adaptive Threshold
-        if val_bloque % 2 == 0: val_bloque += 1 
-        if val_bloque < 3: val_bloque = 3
+        rutas_finales, imagen_final = procesar_frame(frame, config)
 
-        # --- PRE-PROCESADO ---
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.medianBlur(gray, 5)  
-        
-        edges = cv2.adaptiveThreshold(
-            gray, 255,  
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  
-            cv2.THRESH_BINARY,  
-            val_bloque,  
-            val_c
-        )
-        
-        edges_inv = cv2.bitwise_not(edges)
-        kernel = np.ones((2,2), np.uint8)
-        edges_cleaned = cv2.morphologyEx(edges_inv, cv2.MORPH_OPEN, kernel)
-        
-        imagen_final = edges_cleaned.copy()
-
-        # --- LÓGICA DE RETORNO Y VISUALIZACIÓN ---
         if not usar_ui:
-            rutas_finales = extraer_vectores_organicos(edges_cleaned, val_suavidad, val_basura)
             break
         else:
-            cv2.imshow(win_name, edges_cleaned)
+            cv2.imshow(win_name, imagen_final)
             
             key = cv2.waitKey(1)
-            if key & 0xFF == ord('q'):  
+            if key & 0xFF == ord('q'):   
+                rutas_finales = []
                 break
             elif key & 0xFF == ord('t'):
-                # Visualización opcional en la UI (se calcula y se dibuja)
-                rutas_finales = extraer_vectores_organicos(edges_cleaned, val_suavidad, val_basura)
-                
                 lienzo_vector = np.zeros((h, w, 3), dtype=np.uint8)
                 for ruta in rutas_finales:
-                    # Convertimos de nuevo a formato numpy solo para el cv2.polylines de previsualización
                     pts_np = np.array(ruta, dtype=np.int32).reshape((-1, 1, 2))
-                    cv2.polylines(lienzo_vector, [pts_np], False, (0, 255, 0), 1)
+                    # Usamos color Rojo/Naranja para diferenciar este script visualmente
+                    cv2.polylines(lienzo_vector, [pts_np], False, (0, 165, 255), 1)
                 
-                cv2.putText(lienzo_vector, f"Curvas Spline: {len(rutas_finales)}", (10, h-20),  
+                cv2.putText(lienzo_vector, f"Lineas Geométricas: {len(rutas_finales)}", (10, h-20),   
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                 cv2.imshow(win_robot, lienzo_vector)
-                print("¡Vectorización orgánica completada! Presiona 'q' para salir y retornar datos.")
+                print("¡Vectorización completada! Presiona 'q' para salir.")
 
     cap.release()
-    if usar_ui:
-        cv2.destroyAllWindows()
-        
+    if usar_ui: cv2.destroyAllWindows()
     return rutas_finales, imagen_final
 
-# ==========================================
-# PRUEBA DE UNIDAD LOCAL
-# ==========================================
 if __name__ == "__main__":
-    print("Iniciando módulo de visión (Splines Orgánicos)...")
-    coordenadas, matriz_img = obtener_trazos_organicos(usar_ui=True) 
-    
-    if coordenadas:
-        print(f"\n¡Listo! Extraídas {len(coordenadas)} curvas suavizadas con Scipy.")
-    else:
-        print("\nCancelado.")
+    print("Iniciando módulo de visión (Script 3 - Low Poly)...")
+    coordenadas, matriz_img = obtener_trazos_geometricos(usar_ui=True) 
+    if coordenadas: print(f"\n¡Listo! Extraídas {len(coordenadas)} rutas.")
+    else: print("\nCancelado.")

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIG-Lynx | Mecatrónica y Visión Artificial</title>
+    <link rel="stylesheet" href="/web/css/style.css">
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+</head>
+<body>
+    <div class="stars-background"></div>
+
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo-group">
+                <div class="logo-circle">
+                    <img src="/assets/logo.jpeg" alt="Logo" class="nav-logo-img">
+                </div>
+                <span class="nav-logo-text">SIG-LYNX PRO</span>
+            </div>
+            <div class="nav-status">
+                <span class="status-dot"></span> 
+                <span class="status-text">SISTEMA ONLINE</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-wrapper">
+        <section class="processing-section">
+            <div class="glass-card processing-box">
+                <header class="panel-header">
+                    <h2 class="title-glow">Módulo de Visión Artificial</h2>
+                    <p class="subtitle">Análisis Cinemático y Digital LYNX</p>
+                </header>
+                
+                <div class="stream-grid">
+                    <div class="stream-item">
+                        <h3>📷 Entrada Original</h3>
+                        <div class="video-wrapper">
+                            <video id="webcam" autoplay playsinline style="display:none;"></video>
+                            <img id="imgOriginal" src="/assets/textura.jpg" alt="Entrada">
+                            <canvas id="captureCanvas" style="display:none;"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="stream-item">
+                        <h3>🖼️ Resultado (Filtro Lynx)</h3>
+                        <div class="video-wrapper">
+                            <img id="imgResult" src="/assets/textura.jpg" alt="Resultado">
+                            <a id="downloadBtn" class="btn-download" style="display:none" download="lynx_analisis.png">
+                                📥 Descargar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-bar-container">
+                    <div class="action-bar">
+                        <div class="control-group">
+                            <button id="startBtn" class="btn-main btn-glow-blue">▶️ Iniciar Cámara</button>
+                            <button id="captureBtn" class="btn-main btn-capture" style="display:none;">📸 Capturar</button>
+                            <button id="stopBtn" class="btn-main btn-danger" style="display:none;">⏹️ Detener</button>
+                        </div>
+                        
+                        <div class="action-separator">|</div>
+
+                        <div class="control-group">
+                            <input type="file" id="imageInput" accept="image/*" hidden>
+                            <button class="btn-main btn-secondary" onclick="document.getElementById('imageInput').click()">
+                                📁 Subir Imagen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="mathDashboard" style="margin-top: 35px; padding: 25px; background: rgba(10, 15, 20, 0.8); border-radius: 15px; border: 1px solid rgba(0, 230, 255, 0.3); display: none; box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);">
+                    <h3 class="title-glow text-neon-blue" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; font-family: monospace;">
+                        <span style="font-size: 1.2em;">⚙️</span> REPORTES DE TRAYECTORIA CINEMÁTICA
+                    </h3>
+                    <div id="formulaContainer" style="color: #e0e0e0; max-height: 300px; overflow-y: auto; padding: 10px 20px; font-size: 1.1em;">
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="info-wrapper">
+            <div class="info-content-card">
+                <div class="info-text-container">
+                    <h2 class="title-glow text-neon-blue">Presentación del Proyecto</h2>
+                    <p>SIG-Lynx es un sistema de inspección geométrica, multicontrol con estructura en ROS2, permitiendo el control de diferentes dispositivos y permitiendo a diferentes máquinas con diversos ángulos de movimiento ser más precisos.</p>
+                    <p>En esta demostración, exhibiremos el funcionamiento del sistema en un hardware de bajo costo; Lynxmotion, un sistema didáctico, para volverlo más eficiente y preciso.</p>
+                </div>
+            </div>
+            
+            <div class="info-content-card">
+                <div class="info-photo-container">
+                    <img src="/assets/info1.jpeg" alt="Mecatrónica">
+                </div>
+                <div class="info-text-container">
+                    <h2 class="title-glow text-neon-blue">Ingeniería de Precisión</h2>
+                    <p>SIG-Lynx garantiza la máxima precisión robótica mediante actuadores de alta respuesta acoplados a una arquitectura de cálculo inverso en tiempo real.</p>
+                </div>
+            </div>
+
+            <div class="info-content-card inverted">
+                <div class="info-text-container">
+                    <h2 class="title-glow text-neon-yellow">Visión Artificial</h2>
+                    <p>Identificación de patrones y extracciones vectoriales para la toma de decisiones críticas en trayectorias espaciales.</p>
+                </div>
+                <div class="info-photo-container">
+                    <img src="/assets/info2.jpeg" alt="Visión">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/web/js/script.js"></script>
+</body>
+</html>

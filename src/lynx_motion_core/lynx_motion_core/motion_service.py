@@ -2,101 +2,81 @@ import rclpy
 from rclpy.node import Node
 import json
 import time
-import math
 import os
 
-from sensor_msgs.msg import JointState
 from lynx_interfaces.srv import EjecutarMovimiento
-from lynx_motion_core.motion import kinematics
+from lynx_motion_core.motion.kinematics import calcular_ik
 from lynx_motion_core.motion.ssc32u_controller import ControladorSSC32U
 
-class MotionWrapperService(Node):
-    """
-    Nodo servidor para ejecutar trayectorias fisicas y en simulacion.
-    Lee las dimensiones del YAML para pasarlas a la cinematica inversa.
-    """
+class MotionExecutionService(Node):
     def __init__(self):
-        super().__init__('motion_wrapper_service')
+        super().__init__('motion_execution_service')
         
-        self.joint_pub = self.create_publisher(JointState, 'joint_states', 10)
+        # Inicializar controlador serial
+        # Asegúrate de que la ruta al YAML sea correcta desde donde lanzas el nodo
+        self.hardware = ControladorSSC32U(archivo_config="src/lynx_motion_core/lynx_motion_core/config_motores.yaml")
         
-        # Inicializar el controlador y cargar la configuracion
-        ruta_yaml = os.path.join(os.path.dirname(__file__), 'config_motores.yaml')
-        self.robot_hardware = ControladorSSC32U(archivo_config=ruta_yaml)
-        
-        # Extraer dimensiones dinamicas del YAML
-        dimensiones = self.robot_hardware.config_completa.get('dimensiones_brazo', {})
-        self.L1 = dimensiones.get('L1', 70.0)
-        self.L2 = dimensiones.get('L2', 146.0)
-        self.L3 = dimensiones.get('L3', 181.0)
-        
-        self.get_logger().info(f"Dimensiones cargadas: L1={self.L1}, L2={self.L2}, L3={self.L3}")
-        
-        self.srv = self.create_service(EjecutarMovimiento, 'ejecutar_trayectoria', self.procesar_movimiento)
-        self.get_logger().info('Servicio de Movimiento iniciado. Hardware y RViz enlazados.')
+        # Cargar dimensiones del brazo desde el YAML
+        dims = self.hardware.config_completa.get("dimensiones_brazo", {})
+        self.L1 = dims.get("altura_base", 115.0)
+        self.L2 = dims.get("brazo_superior", 155.0)
+        self.L3 = dims.get("antebrazo", 185.0)
+        self.L4 = dims.get("efector_final", 115.0)
 
-    def procesar_movimiento(self, request, response):
+        self.srv = self.create_service(EjecutarMovimiento, 'ejecutar_movimiento_robot', self.ejecutar_callback)
+        self.get_logger().info('Servicio de Movimiento AL5D listo (90=Vertical).')
+
+    def ejecutar_callback(self, request, response):
+        self.get_logger().info('Iniciando ejecucion de trayectoria...')
         try:
-            matriz_espacial = json.loads(request.matriz_espacial_json)
+            puntos_3d = json.loads(request.matriz_espacial_json)
             
-            for punto in matriz_espacial:
-                x, y, z = punto[0], punto[1], punto[2]
-                
-                # Pasar las dimensiones leidas del YAML a la funcion pura
-                angulos = kinematics.calcular_ik(x, y, z, self.L1, self.L2, self.L3, angulo_lapiz_deseado=-90.0)
-                
-                if angulos is None:
-                    self.get_logger().warning(f"Punto inalcanzable ignorado: ({x}, {y}, {z})")
-                    continue
-                    
-                theta_base, theta_hombro, theta_codo, theta_muneca = angulos
-                
-                diccionario_angulos = {
-                    'joint_base_rotate': theta_base,
-                    'joint_shoulder': theta_hombro,
-                    'joint_elbow': theta_codo,
-                    'joint_wrist': theta_muneca
-                }
+            for i, punto in enumerate(puntos_3d):
+                # Manejo flexible de formato de datos
+                if isinstance(punto, (list, tuple)):
+                    x, y, z = float(punto[0]), float(punto[1]), float(punto[2])
+                else:
+                    x = float(punto.get('x', 0))
+                    y = float(punto.get('y', 0))
+                    z = float(punto.get('z', 0))
 
-                self.robot_hardware.mover_multiples_articulaciones(diccionario_angulos, tiempo=100)
-                self.publicar_rviz(diccionario_angulos)
+                # Calcular ángulos con la nueva cinemática
+                angulos = calcular_ik(x, y, z, self.L1, self.L2, self.L3, self.L4)
+
+                if angulos:
+                    dict_angulos = {
+                        'joint_base_rotate': angulos[0],
+                        'joint_shoulder': angulos[1],
+                        'joint_elbow': angulos[2],
+                        'joint_wrist': angulos[3]
+                    }
+                    # Enviar al SSC-32U
+                    # tiempo=50ms para suavidad en trayectorias densas
+                    self.hardware.mover_multiples_articulaciones(dict_angulos, tiempo=50)
+                    time.sleep(0.05)
                 
-                # Pausa para dar tiempo al hardware de ejecutar el comando serial
-                time.sleep(0.1)
+                if i % 500 == 0:
+                    self.get_logger().info(f"Procesando punto {i}...")
 
             response.success = True
-            response.error_message = ""
-            self.get_logger().info('Trayectoria completada fisicamente y en simulacion.')
+            self.get_logger().info('Trayectoria completada.')
 
         except Exception as e:
             response.success = False
             response.error_message = str(e)
-            self.get_logger().error(f'Error ejecutando movimiento: {e}')
+            self.get_logger().error(f'Error en ejecucion: {e}')
             
         return response
 
-    def publicar_rviz(self, dicc_angulos):
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = list(dicc_angulos.keys())
-        
-        posiciones_rad = []
-        for nombre in msg.name:
-            grados = dicc_angulos[nombre]
-            posiciones_rad.append(math.radians(grados))
-            
-        msg.position = posiciones_rad
-        self.joint_pub.publish(msg)
-
 def main(args=None):
     rclpy.init(args=args)
-    motion_service = MotionWrapperService()
+    node = MotionExecutionService()
     try:
-        rclpy.spin(motion_service)
+        rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        motion_service.destroy_node()
+        node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
