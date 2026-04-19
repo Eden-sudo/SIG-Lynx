@@ -4,14 +4,14 @@ import signal
 import time
 
 class ProcessManager:
-    """Gestiona la ejecucion y terminacion de procesos externos (ROS 2) desde la UI."""
+    """Manages the execution and termination of external processes (ROS 2) from the UI."""
     def __init__(self):
         self.proceso_simulacion = None
         self.proceso_servidor = None
         self.proceso_vision = None
         self.proceso_calculo = None
 
-        # Rutas dinamicas
+        # Dynamic paths
         self.directorio_actual = os.path.dirname(os.path.abspath(__file__))
         self.ruta_raiz_proyecto = os.path.abspath(os.path.join(self.directorio_actual, '..'))
         self.ruta_setup_ros = os.path.join(self.ruta_raiz_proyecto, 'install', 'setup.bash')
@@ -45,17 +45,25 @@ class ProcessManager:
         )
 
     def detener_simulacion(self):
-        if self.proceso_simulacion: self._matar(self.proceso_simulacion); self.proceso_simulacion = None
+        if self.proceso_simulacion: 
+            self._matar(self.proceso_simulacion)
+            self.proceso_simulacion = None
         
     def detener_vision(self):
-        if self.proceso_vision: self._matar(self.proceso_vision); self.proceso_vision = None
+        if self.proceso_vision: 
+            self._matar(self.proceso_vision)
+            self.proceso_vision = None
 
     def detener_calculo_service(self):
-        if self.proceso_calculo: self._matar(self.proceso_calculo); self.proceso_calculo = None
+        if self.proceso_calculo: 
+            self._matar(self.proceso_calculo)
+            self.proceso_calculo = None
 
     def _matar(self, proceso):
-        try: os.killpg(os.getpgid(proceso.pid), signal.SIGTERM)
-        except: pass
+        try: 
+            os.killpg(os.getpgid(proceso.pid), signal.SIGTERM)
+        except: 
+            pass
 
     def limpiar_todo(self):
         self.detener_simulacion()

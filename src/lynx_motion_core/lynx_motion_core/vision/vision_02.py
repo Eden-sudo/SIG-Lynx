@@ -5,14 +5,10 @@ from scipy.interpolate import splprep, splev
 
 def nothing(x): pass
 
-# ==========================================
-# BLOQUE 1: FUNCIONES MATEMÁTICAS Y DE VISIÓN
-# ==========================================
+# --- Math & Vision Functions ---
+
 def suavizar_contorno_spline(contour, suavidad=0.0):
-    """
-    Convierte un contorno rugoso en una curva B-Spline suave.
-    Retorna una lista de tuplas (x, y).
-    """
+    """Converts a rough contour into a smooth B-Spline curve."""
     pts = [tuple(p[0]) for p in contour]
     unique_pts = [pts[0]]
     for p in pts[1:]:
@@ -26,8 +22,7 @@ def suavizar_contorno_spline(contour, suavidad=0.0):
     y = [p[1] for p in unique_pts]
 
     try:
-        # --- CAMBIO TÉCNICO: per=False ---
-        # Evita que Scipy intente forzar el cierre de la curva, eliminando Warnings.
+        # per=False prevents Scipy from forcing a closed curve, avoiding warnings
         tck, u = splprep([x, y], s=suavidad, per=False)   
         u_new = np.linspace(u.min(), u.max(), len(unique_pts) * 5)
         x_new, y_new = splev(u_new, tck, der=0)
@@ -38,7 +33,7 @@ def suavizar_contorno_spline(contour, suavidad=0.0):
         return [(int(p[0]), int(p[1])) for p in unique_pts]
 
 def extraer_vectores_organicos(imagen_binaria, suavidad, min_len):
-    """Motor de extracción para el look orgánico."""
+    """Extraction engine for organic contour smoothing."""
     contornos, _ = cv2.findContours(imagen_binaria, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     
     rutas_extraidas = []
@@ -49,13 +44,12 @@ def extraer_vectores_organicos(imagen_binaria, suavidad, min_len):
             
     return rutas_extraidas
 
-# ==========================================
-# BLOQUE 2: LÓGICA PURA (ESTANDARIZADA)
-# ==========================================
+# --- Core Logic ---
+
 def procesar_frame(frame, config=None):
     """
-    Aplica la lógica visual B-Spline.
-    Retorna EXACTAMENTE: rutas_finales, edges_cleaned
+    Applies B-Spline visual logic.
+    Returns: rutas_finales, edges_cleaned
     """
     if config is None:
         config = {
@@ -87,31 +81,30 @@ def procesar_frame(frame, config=None):
 
     rutas_finales = extraer_vectores_organicos(edges_cleaned, val_suavidad, val_basura)
 
-    # Retorno estándar de 2 valores
     return rutas_finales, edges_cleaned
 
-# ==========================================
-# BLOQUE 3: CÁMARA Y UI STANDALONE
-# ==========================================
+# --- Camera & Standalone UI ---
+
 def obtener_trazos_organicos(usar_ui=True, cam_index=0):
+    """Standalone test for organic splines extraction."""
     cap = cv2.VideoCapture(cam_index)
     while True:
         ret, frame = cap.read()
         if not ret: break
         
         frame = cv2.flip(frame, 1)
-        # Llamada estandarizada
         rutas, img_debug = procesar_frame(frame)
         
         if usar_ui:
             cv2.imshow('Script 2: Organic Splines', img_debug)
             if cv2.waitKey(1) & 0xFF == ord('q'): break
-        else: break
+        else: 
+            break
             
     cap.release()
     cv2.destroyAllWindows()
     return rutas, img_debug
 
 if __name__ == "__main__":
-    print("Iniciando Módulo de Visión 02 (Splines)...")
+    print("Starting Vision Module 02 (Splines)...")
     obtener_trazos_organicos(usar_ui=True)

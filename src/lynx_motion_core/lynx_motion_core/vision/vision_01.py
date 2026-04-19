@@ -4,11 +4,10 @@ import time
 
 def nothing(x): pass
 
-# ==========================================
-# BLOQUE 1: FUNCIONES DE APOYO
-# ==========================================
+# --- Support Functions ---
+
 def generar_trama(w, h, esp, inv=False):
-    """Genera el patrón de sombreado"""
+    """Generates a shading pattern."""
     patron = np.ones((h, w), dtype=np.uint8) * 255
     if esp < 2: esp = 2
     for i in range(-h, w + h, esp):
@@ -17,7 +16,7 @@ def generar_trama(w, h, esp, inv=False):
     return patron
 
 def limpiar_manchas(mask, min_size):
-    """Elimina ruido y pequeños artefactos de la máscara"""
+    """Removes noise and small artifacts from the mask."""
     if min_size == 0: return mask
     cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     mask_limpia = np.zeros_like(mask)
@@ -27,7 +26,7 @@ def limpiar_manchas(mask, min_size):
     return mask_limpia
 
 def calcular_vectores(imagen_binaria):
-    """Extrae las coordenadas X, Y de la imagen procesada"""
+    """Extracts X, Y coordinates from the processed binary image."""
     img_inv = cv2.bitwise_not(imagen_binaria)
     kernel = np.ones((2,2), np.uint8)
     img_inv = cv2.dilate(img_inv, kernel, iterations=1)
@@ -45,13 +44,12 @@ def calcular_vectores(imagen_binaria):
             
     return rutas
 
-# ==========================================
-# BLOQUE 2: LÓGICA PURA (ESTANDARIZADA)
-# ==========================================
+# --- Core Logic ---
+
 def procesar_frame(frame, config=None):
     """
-    Recibe un frame de OpenCV y aplica la lógica visual.
-    Retorna EXACTAMENTE: rutas_finales, canvas_robot
+    Applies visual logic to an OpenCV frame.
+    Returns: routes (paths), robot_canvas (binary image)
     """
     if config is None:
         config = {
@@ -75,8 +73,8 @@ def procesar_frame(frame, config=None):
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     balanced = clahe.apply(gray)
     
-    rasgos_raw = cv2.adaptiveThreshold(balanced, 255, cv2.ADAPTIVE_THRESH_MEAN_C,  
-                                      cv2.THRESH_BINARY, val_grosor, val_sens)
+    rasgos_raw = cv2.adaptiveThreshold(balanced, 255, cv2.ADAPTIVE_THRESH_MEAN_C,   
+                                        cv2.THRESH_BINARY, val_grosor, val_sens)
     rasgos_inv = cv2.bitwise_not(rasgos_raw)
     rasgos_limpios = limpiar_manchas(rasgos_inv, val_limpieza)
 
@@ -98,22 +96,19 @@ def procesar_frame(frame, config=None):
 
     rutas_finales = calcular_vectores(canvas_robot)
 
-    # --- CAMBIO UNIVERSAL ---
-    # Devolvemos solo las rutas y la imagen binaria final.
     return rutas_finales, canvas_robot
 
-# ==========================================
-# BLOQUE 3: CÁMARA Y UI
-# ==========================================
+# --- Camera & UI ---
+
 def obtener_trazos(usar_ui=True, cam_index=0):
-    """Prueba manual standalone"""
+    """Standalone manual testing."""
     cap = cv2.VideoCapture(cam_index)
     while True:
         ret, frame = cap.read()
         if not ret: break
         
         frame = cv2.flip(frame, 1)
-        rutas, img_debug = procesar_frame(frame) # Llamada estandarizada
+        rutas, img_debug = procesar_frame(frame)
         
         if usar_ui:
             cv2.imshow('Script 1: High Detail', img_debug)
@@ -126,6 +121,5 @@ def obtener_trazos(usar_ui=True, cam_index=0):
     return rutas, img_debug
 
 if __name__ == "__main__":
-    print("Iniciando Script 1 (Estandarizado)...")
+    print("Starting Script 1...")
     obtener_trazos(usar_ui=True)
-

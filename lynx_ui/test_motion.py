@@ -1,76 +1,124 @@
-import yaml
-import serial
+import customtkinter as ctk
 import time
 
-class ControladorSSC32U:
-    def __init__(self, archivo_config="config_motores.yaml", puerto="/dev/ttyUSB0", baudrate=9600):
-        print("="*60)
-        print("[SSC32U-CORE] [BOOT] INICIALIZANDO CONTROLADOR DE HARDWARE")
-        print("="*60)
-        print(f"[SSC32U-CORE] [IO] TRATANDO DE CARGAR YAML: {archivo_config}")
-        
-        try:
-            with open(archivo_config, 'r') as f:
-                self.config_completa = yaml.safe_load(f)
-                self.motores = self.config_completa.get("articulaciones", {})
-            print(f"[SSC32U-CORE] [IO-SUCCESS] YAML CARGADO. {len(self.motores)} MOTORES ENCONTRADOS.")
-        except Exception as e:
-            print(f"[SSC32U-CORE] [FATAL-IO] ERROR CARGANDO {archivo_config}: {e}")
-            self.motores = {}
-            self.config_completa = {}
-            
-        print(f"[SSC32U-CORE] [SERIAL] INTENTANDO ABRIR PUERTO -> DISPOSITIVO: {puerto} | BAUDRATE: {baudrate}")
-        try:
-            self.serial = serial.Serial(puerto, baudrate, timeout=1)
-            # Pequeña pausa porque algunos chips USB-Serial se reinician al abrir la conexión
-            time.sleep(1.5) 
-            print(f"[SSC32U-CORE] [SERIAL-SUCCESS] PUERTO ABIERTO Y ESTABILIZADO: {self.serial.name}")
-        except serial.SerialException as e:
-            print(f"[SSC32U-CORE] [SERIAL-ERROR] NO SE PUDO ABRIR EL PUERTO {puerto}.")
-            print(f"[SSC32U-CORE] [SERIAL-TRACE] CAUSA EXACTA: {e}")
-            print(f"[SSC32U-CORE] [WARN] EL SISTEMA ENTRARÁ EN MODO SIMULACIÓN. EL HARDWARE NO SE MOVERÁ.")
-            self.serial = None
+# Manager Imports
+from process_manager import ProcessManager
+from config_manager import ConfigManager
+from ros_client_manager import RosManager
 
-    def grados_a_pwm(self, grados):
-        pwm = 500 + (grados / 180.0) * 2000
-        return int(max(500, min(2500, pwm)))
+# View Imports
+from views.view_config import ConfigView
+from views.view_process import ProcessView
+from views.view_operation import OperationView
 
-    def mover_multiples_articulaciones(self, diccionario_angulos, tiempo=1000):
-        print(f"\n[SSC32U-CORE] [RX-CMD] RECIBIDA ORDEN DE MOVIMIENTO: {diccionario_angulos}")
-        comando_completo = ""
+ctk.set_appearance_mode("Dark")
+ctk.set_default_color_theme("blue")
+
+class LynxApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        self.title("SIG-Lynx Control Panel")
+        self.geometry("1100x700")
+
+        # 1. Initialize Managers
+        self.process_manager = ProcessManager()
+        self.config_manager = ConfigManager()
+        self.ros_manager = RosManager()
+
+        # 2. Main Grid Configuration (1 row, 2 columns)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+
+        # 3. Sidebar (Navigation Menu)
+        self.frame_sidebar = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.frame_sidebar.grid(row=0, column=0, sticky="nsew")
         
-        for nombre, grados in diccionario_angulos.items():
-            if nombre not in self.motores: 
-                print(f"[SSC32U-CORE] [WARN] Articulación ignorada (No existe en YAML): {nombre}")
-                continue
+        self.logo_label = ctk.CTkLabel(self.frame_sidebar, text="SIG-Lynx", font=ctk.CTkFont(size=24, weight="bold"))
+        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 30))
+
+        self.btn_nav_config = ctk.CTkButton(self.frame_sidebar, text="Configuration", fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"), command=lambda: self.seleccionar_frame("config"))
+        self.btn_nav_config.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+
+        self.btn_nav_process = ctk.CTkButton(self.frame_sidebar, text="Processes", fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"), command=lambda: self.seleccionar_frame("process"))
+        self.btn_nav_process.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
+        self.btn_nav_operacion = ctk.CTkButton(self.frame_sidebar, text="Operations", fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"), command=lambda: self.seleccionar_frame("operacion"))
+        self.btn_nav_operacion.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+
+        # 4. Global Console
+        self.textbox_log = ctk.CTkTextbox(self.frame_sidebar, font=ctk.CTkFont(family="monospace", size=11), height=200)
+        self.textbox_log.grid(row=5, column=0, padx=10, pady=20, sticky="s")
+        self.frame_sidebar.grid_rowconfigure(4, weight=1)
+
+        # 5. View Instantiation
+        self.frame_config = ConfigView(self, self.config_manager, self.log, corner_radius=0, fg_color="transparent")
+        self.frame_process = ProcessView(self, self.ros_manager, self.log, corner_radius=0, fg_color="transparent")
+        self.frame_operacion = OperationView(self, self.ros_manager, self.log, corner_radius=0, fg_color="transparent")
+
+        # Set default view
+        self.seleccionar_frame("process")
+        self.log("System initialized. UI loaded successfully.")
+
+    def log(self, mensaje, nivel="INFO", detalle=None):
+        """Unified logging system for UI and terminal."""
+        hora = time.strftime("%H:%M:%S")
+
+        if nivel == "ERROR":
+            prefijo = "[ERROR]"
+            color = "\033[91m"  # Red
+        elif nivel == "WARN":
+            prefijo = "[WARN] "
+            color = "\033[93m"  # Yellow
+        else:
+            prefijo = "[INFO] "
+            color = "\033[94m"  # Blue
+
+        reset_color = "\033[0m"
+        mensaje_base = f"[{hora}] {prefijo} {mensaje}"
+
+        if detalle:
+            mensaje_ui = f"{mensaje_base}\n{detalle}\n"
+            mensaje_terminal = f"{color}{mensaje_base}\n{detalle}{reset_color}"
+        else:
+            mensaje_ui = f"{mensaje_base}\n"
+            mensaje_terminal = f"{color}{mensaje_base}{reset_color}"
+
+        self.textbox_log.insert("end", mensaje_ui)
+        self.textbox_log.see("end")
+        print(mensaje_terminal)
+
+    def seleccionar_frame(self, nombre_frame):
+        """Switches between UI frames."""
+        self.frame_config.grid_forget()
+        self.frame_process.grid_forget()
+        self.frame_operacion.grid_forget()
+
+        self.btn_nav_config.configure(fg_color="transparent")
+        self.btn_nav_process.configure(fg_color="transparent")
+        self.btn_nav_operacion.configure(fg_color="transparent")
+
+        if nombre_frame == "config":
+            self.frame_config.grid(row=0, column=1, sticky="nsew")
+            self.btn_nav_config.configure(fg_color=("gray75", "gray25"))
+        elif nombre_frame == "process":
+            self.frame_process.grid(row=0, column=1, sticky="nsew")
+            self.btn_nav_process.configure(fg_color=("gray75", "gray25"))
+        elif nombre_frame == "operacion":
+            self.frame_operacion.grid(row=0, column=1, sticky="nsew")
+            self.btn_nav_operacion.configure(fg_color=("gray75", "gray25"))
+
+    def destroy(self):
+        """Handles safe shutdown of child processes and ROS nodes."""
+        self.log("Shutting down system...")
+        if hasattr(self, 'process_manager'):
+            self.process_manager.limpiar_todo()
             
-            # --- CANDADO DE PINZA ---
-            if nombre == 'joint_gripper_finger':
-                grados = max(68.0, min(180.0, grados))
-                print(f"[SSC32U-CORE] [SEC-CHECK] Pinza forzada a márgenes seguros: {grados}°")
-                
-            datos = self.motores[nombre]
-            canal = datos["canal"]
-            grados_finales = grados + datos["offset_grados"]
-            pulso = self.grados_a_pwm(grados_finales)
+        if hasattr(self, 'ros_manager'):
+            self.ros_manager.detener()
             
-            print(f"[SSC32U-CORE] [MATH] {nombre} | Input: {grados}° | Offset: {datos['offset_grados']}° | Final: {grados_finales}° | PWM: {pulso}")
-            
-            comando_completo += f"#{canal} P{pulso} "
-            
-        if comando_completo:
-            # El SSC-32U REQUIERE ESTRICTAMENTE un Carriage Return (\r) al final para ejecutar.
-            comando_completo += f"T{tiempo}\r"
-            
-            # Usamos repr() para ver si los espacios y el \r están correctos en consola
-            print(f"[SSC32U-CORE] [TX-RAW] STRING ASCII A ENVIAR: {repr(comando_completo)}")
-            
-            if self.serial:
-                try:
-                    self.serial.write(comando_completo.encode('ascii'))
-                    print("[SSC32U-CORE] [TX-SUCCESS] BYTES ENVIADOS CORRECTAMENTE AL BUFFER USB.")
-                except Exception as e:
-                    print(f"[SSC32U-CORE] [TX-ERROR] FALLÓ LA ESCRITURA EN EL PUERTO SERIAL: {e}")
-            else:
-                print(f"[SSC32U-CORE] [SIMULADOR] VIRTUAL TX BYPASS: {repr(comando_completo)}")
-        print("="*60)
+        super().destroy()
+
+if __name__ == "__main__":
+    app = LynxApp()
+    app.mainloop()

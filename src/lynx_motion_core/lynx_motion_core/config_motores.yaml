@@ -1,9 +1,9 @@
 # config_motores.yaml
 dimensiones_brazo:
-  altura_base: 115.0      # Desde la mesa hasta el eje del hombro
-  brazo_superior: 155.0   # Hombro a Codo (L2 anterior)
-  antebrazo: 185.0        # Codo a Muñeca (L3 anterior)
-  efector_final: 115.0    # Muñeca a punta (Tornillo dorado/lápiz)
+  altura_base: 115.0      # From table surface to shoulder axis
+  brazo_superior: 155.0   # Shoulder to elbow (former L2)
+  antebrazo: 185.0        # Elbow to wrist (former L3)
+  efector_final: 115.0    # Wrist to tip (Golden screw/pen)
 
 articulaciones:
   joint_base_rotate:
@@ -12,19 +12,19 @@ articulaciones:
     invertido: false
   joint_shoulder:
     canal: 1
-    offset_grados: -5     # Corregido de 85° a 90°
+    offset_grados: -5     # Corrected from 85° to 90°
     invertido: false
   joint_elbow:
     canal: 2
-    offset_grados: -20    # Corregido de 70° a 90°
+    offset_grados: -20    # Corrected from 70° to 90°
     invertido: false
   joint_wrist:
     canal: 3
-    offset_grados: 4      # Corregido de 94° a 90°
+    offset_grados: 4      # Corrected from 94° to 90°
     invertido: false
   joint_gripper_rotate:
     canal: 4
-    offset_grados: 27     # Corregido de 117° a 90°
+    offset_grados: 27     # Corrected from 117° to 90°
     invertido: false
   joint_gripper_finger:
     canal: 5

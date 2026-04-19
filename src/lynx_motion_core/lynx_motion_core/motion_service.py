@@ -1,3 +1,15 @@
+"""
+Hardware Controller and Actuators - SIG-Lynx
+
+Receives the processed angular matrix, strictly validated against singularities.
+Instantiates the trajectory in the physical arm by translating geometric degrees
+into Pulse Width Modulation (PWM) signals for the SSC-32U controller board.
+Respects the morphology of the toroidal workspace, limiting contraction and extension.
+
+Input: Articular angle matrix.
+Output: PWM signals to the electromechanical hardware.
+"""
+
 import rclpy
 from rclpy.node import Node
 import json
@@ -12,11 +24,10 @@ class MotionExecutionService(Node):
     def __init__(self):
         super().__init__('motion_execution_service')
         
-        # Inicializar controlador serial
-        # Asegúrate de que la ruta al YAML sea correcta desde donde lanzas el nodo
+        # Initialize serial hardware controller
         self.hardware = ControladorSSC32U(archivo_config="src/lynx_motion_core/lynx_motion_core/config_motores.yaml")
         
-        # Cargar dimensiones del brazo desde el YAML
+        # Load arm physical dimensions from YAML
         dims = self.hardware.config_completa.get("dimensiones_brazo", {})
         self.L1 = dims.get("altura_base", 115.0)
         self.L2 = dims.get("brazo_superior", 155.0)
@@ -24,15 +35,15 @@ class MotionExecutionService(Node):
         self.L4 = dims.get("efector_final", 115.0)
 
         self.srv = self.create_service(EjecutarMovimiento, 'ejecutar_movimiento_robot', self.ejecutar_callback)
-        self.get_logger().info('Servicio de Movimiento AL5D listo (90=Vertical).')
+        self.get_logger().info('>>> LYNX MOTION SERVICE READY (90=Vertical) <<<')
 
     def ejecutar_callback(self, request, response):
-        self.get_logger().info('Iniciando ejecucion de trayectoria...')
+        self.get_logger().info('Starting trajectory execution...')
         try:
             puntos_3d = json.loads(request.matriz_espacial_json)
             
             for i, punto in enumerate(puntos_3d):
-                # Manejo flexible de formato de datos
+                # Flexible data format handling
                 if isinstance(punto, (list, tuple)):
                     x, y, z = float(punto[0]), float(punto[1]), float(punto[2])
                 else:
@@ -40,7 +51,7 @@ class MotionExecutionService(Node):
                     y = float(punto.get('y', 0))
                     z = float(punto.get('z', 0))
 
-                # Calcular ángulos con la nueva cinemática
+                # Compute Inverse Kinematics
                 angulos = calcular_ik(x, y, z, self.L1, self.L2, self.L3, self.L4)
 
                 if angulos:
@@ -50,21 +61,21 @@ class MotionExecutionService(Node):
                         'joint_elbow': angulos[2],
                         'joint_wrist': angulos[3]
                     }
-                    # Enviar al SSC-32U
-                    # tiempo=50ms para suavidad en trayectorias densas
+                    
+                    # Dispatch to SSC-32U (50ms interval for smooth dense trajectories)
                     self.hardware.mover_multiples_articulaciones(dict_angulos, tiempo=50)
                     time.sleep(0.05)
                 
                 if i % 500 == 0:
-                    self.get_logger().info(f"Procesando punto {i}...")
+                    self.get_logger().info(f"Processing waypoint {i}...")
 
             response.success = True
-            self.get_logger().info('Trayectoria completada.')
+            self.get_logger().info('Trajectory completed successfully.')
 
         except Exception as e:
             response.success = False
             response.error_message = str(e)
-            self.get_logger().error(f'Error en ejecucion: {e}')
+            self.get_logger().error(f'Execution error: {e}')
             
         return response
 

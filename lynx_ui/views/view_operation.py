@@ -14,13 +14,13 @@ class OperationView(ctk.CTkFrame):
         self.ros_manager = ros_manager
         self.log = logger_func
 
-        # Variables de estado
+        # State Variables
         self.cap = None
         self.ruta_imagen_actual = ""
         self.rutas_json_actual = ""  
         self.matriz_json_actual = ""  
 
-        # Layout
+        # Layout Configuration
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure(1, weight=1)   
         self.grid_rowconfigure(3, weight=1)   
@@ -30,28 +30,28 @@ class OperationView(ctk.CTkFrame):
                                    font=ctk.CTkFont(size=22, weight="bold", family="monospace"))
         self.titulo.grid(row=0, column=0, columnspan=2, pady=15, padx=20, sticky="w")
 
-        # --- MONITORES VISUALES ---
+        # --- VISUAL MONITORS ---
         self.lbl_img_original = ctk.CTkLabel(self, text="[ RAW_INPUT ]", bg_color="#0a0a0a", corner_radius=5)
         self.lbl_img_original.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
 
         self.lbl_img_procesada = ctk.CTkLabel(self, text="[ VECTOR_MAP ]", bg_color="#0a0a0a", corner_radius=5)
         self.lbl_img_procesada.grid(row=1, column=1, padx=10, pady=5, sticky="nsew")
 
-        # --- PANEL DE ACCIONES ---
+        # --- ACTION PANEL ---
         self.frame_actions = ctk.CTkFrame(self, fg_color="transparent")
         self.frame_actions.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
-        # Botones de Cámara
+        # Camera Controls
         ctk.CTkButton(self.frame_actions, text="CAM ON", command=self.toggle_camara, width=90).pack(side="left", padx=5)
         self.btn_capturar = ctk.CTkButton(self.frame_actions, text="SNAP", state="disabled", command=self.capturar_foto, width=90)
         self.btn_capturar.pack(side="left", padx=5)
 
-        # Botones de Ejecución
+        # Execution Controls
         self.btn_dibujar = ctk.CTkButton(self.frame_actions, text="RUN ROBOT", fg_color="#1f612d", hover_color="#2ecc71", command=self.llamar_movimiento)
         self.btn_dibujar.pack(side="right", padx=5)
 
-        # NUEVO BOTÓN: SIMULAR 3D
-        self.btn_simular = ctk.CTkButton(self.frame_actions, text="SIMULAR 3D", fg_color="#8e44ad", hover_color="#9b59b6", command=self.abrir_simulador)
+        # 3D Simulation
+        self.btn_simular = ctk.CTkButton(self.frame_actions, text="3D SIMULATE", fg_color="#8e44ad", hover_color="#9b59b6", command=self.abrir_simulador)
         self.btn_simular.pack(side="right", padx=5)
 
         self.btn_calcular = ctk.CTkButton(self.frame_actions, text="CALC", command=self.llamar_calculo, width=90)
@@ -63,13 +63,13 @@ class OperationView(ctk.CTkFrame):
         self.script_var = ctk.StringVar(value="1")
         ctk.CTkOptionMenu(self.frame_actions, values=["1", "2", "3"], variable=self.script_var, width=60).pack(side="right", padx=5)
 
-        # --- TERMINAL DE ECUACIONES (EL DASHBOARD) ---
+        # --- EQUATION TERMINAL (DASHBOARD) ---
         self.textbox_formulas = ctk.CTkTextbox(self, font=("Consolas", 13), fg_color="#050505", text_color="#00ffcc", border_width=1, border_color="#333")
         self.textbox_formulas.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
         self.textbox_formulas.insert("0.0", ">> SYSTEM READY. AWAITING DATA...\n")
 
     # ==========================================
-    # CONTROL DE CÁMARA
+    # CAMERA CONTROL
     # ==========================================
     def toggle_camara(self):
         if self.cap is None:
@@ -111,11 +111,11 @@ class OperationView(ctk.CTkFrame):
         label.image = ctk_img
 
     # ==========================================
-    # COMUNICACIÓN ROS 2 (THROUGHPUT SEGURO)
+    # ROS 2 COMMUNICATION (SAFE THROUGHPUT)
     # ==========================================
     def llamar_vision(self):
         if not self.ruta_imagen_actual: return
-        self.log("Procesando visión...", nivel="INFO")
+        self.log("Processing vision...", nivel="INFO")
         self.ros_manager.solicitar_vision(self.ruta_imagen_actual, self.script_var.get(), self.callback_vision)
 
     def callback_vision(self, resp):
@@ -125,7 +125,7 @@ class OperationView(ctk.CTkFrame):
         if resp and resp.success:
             self.rutas_json_actual = resp.trajectories_json
             rutas = json.loads(resp.trajectories_json)
-            self.log(f"Visión exitosa: {len(rutas)} trazos.", nivel="INFO")
+            self.log(f"Vision successful: {len(rutas)} vectors extracted.", nivel="INFO")
             
             canvas = np.ones((480, 640, 3), dtype=np.uint8) * 255
             for r in rutas:
@@ -134,11 +134,11 @@ class OperationView(ctk.CTkFrame):
                     cv2.polylines(canvas, [pts], False, (15,15,15), 2, cv2.LINE_AA)
             cv2.imwrite("/tmp/lynx_vision_output.jpg", canvas)
             self.mostrar_img("/tmp/lynx_vision_output.jpg", self.lbl_img_procesada)
-        else: self.log("Error en Visión", nivel="ERROR")
+        else: self.log("Vision Error", nivel="ERROR")
 
     def llamar_calculo(self):
         if not self.rutas_json_actual: return
-        self.log("Iniciando cálculo cinemático...", nivel="INFO")
+        self.log("Starting kinematic calculus...", nivel="INFO")
         conf = json.dumps({'X_MIN': -100.0, 'X_MAX': 100.0, 'Y_MIN': 160.0, 'Y_MAX': 300.0, 'Z_DIBUJO': 0.0, 'Z_TRANSITO': 15.0})
         self.ros_manager.solicitar_calculo(self.rutas_json_actual, conf, 640, 480, 5.0, self.callback_calculo)
 
@@ -160,28 +160,28 @@ class OperationView(ctk.CTkFrame):
                 self.textbox_formulas.insert("end", f"SEG_{i+1:03d} {f_math}\n")
                 self.textbox_formulas.insert("end", "─"*65 + "\n")
             
-            self.log(f"Cálculo completado: {len(formulas)} segmentos.", nivel="INFO")
-        else: self.log("Error en Cálculo", nivel="ERROR")
+            self.log(f"Calculus completed: {len(formulas)} segments mapped.", nivel="INFO")
+        else: self.log("Calculus Error", nivel="ERROR")
 
-    # --- SIMULACIÓN Y MOVIMIENTO ---
+    # --- SIMULATION AND MOTION ---
     def abrir_simulador(self):
-        """Dispara los datos al nodo animador de RViz"""
+        """Dispatches data to the RViz animator node"""
         if not self.matriz_json_actual:
-            self.log("Error: Genera el cálculo cinemático primero.", nivel="WARN")
+            self.log("Error: Generate kinematic calculus first.", nivel="WARN")
             return
 
-        self.log("Transmitiendo coordenadas a RViz...", nivel="INFO")
+        self.log("Transmitting coordinates to RViz...", nivel="INFO")
         
-        # Usamos el callback para confirmar que se mandó sin congelar la UI
+        # Callback used to confirm transmission without freezing UI
         self.ros_manager.enviar_a_simulacion_rviz(
-            self.matriz_json_actual, 
-            lambda r: self.after(0, lambda: self.log("¡Simulación 3D en curso en RViz!", nivel="INFO"))
+            self.matriz_json_actual,  
+            lambda r: self.after(0, lambda: self.log("3D Simulation running in RViz!", nivel="INFO"))
         )
 
     def llamar_movimiento(self):
         if not self.matriz_json_actual: return
-        self.log("EJECUTANDO TRAYECTORIA EN ROBOT...", nivel="INFO")
-        self.ros_manager.solicitar_movimiento(self.matriz_json_actual, lambda r: self.after(0, lambda: self.log("FIN DE TRAYECTORIA", nivel="INFO")))
+        self.log("EXECUTING TRAJECTORY ON ROBOT...", nivel="INFO")
+        self.ros_manager.solicitar_movimiento(self.matriz_json_actual, lambda r: self.after(0, lambda: self.log("TRAJECTORY COMPLETED", nivel="INFO")))
 
     def cargar_archivo(self):
         ruta = filedialog.askopenfilename()

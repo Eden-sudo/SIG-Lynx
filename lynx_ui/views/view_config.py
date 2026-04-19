@@ -9,95 +9,95 @@ class ConfigView(ctk.CTkScrollableFrame):
         self.config_manager = config_manager
         self.log = logger_func
 
-        # Título principal
+        # Main Title
         self.titulo = ctk.CTkLabel(
             self, 
-            text="⚙️ Panel de Calibración Maestra", 
+            text="Master Calibration Panel", 
             font=ctk.CTkFont(size=20, weight="bold")
         )
         self.titulo.grid(row=0, column=0, columnspan=2, pady=(20, 10), padx=20, sticky="w")
 
-        # Variables de control
+        # Control Variables
         self.entries_dim = {}
         self.entries_offset = {}
-        self.puerto_seleccionado = ctk.StringVar(value="Buscando...")
+        self.puerto_seleccionado = ctk.StringVar(value="Scanning...")
 
-        # Construcción de la interfaz
+        # UI Construction
         self.crear_seccion_conexion(row=1)
         self.crear_seccion_dimensiones(row=2)
         self.crear_seccion_offsets(row=3)
 
-        # Botón de guardado
+        # Save Button
         self.btn_guardar = ctk.CTkButton(
             self, 
-            text="💾 GUARDAR CONFIGURACIÓN", 
+            text="SAVE CONFIGURATION", 
             fg_color="#1f612d", 
             hover_color="#2ecc71", 
             command=self.guardar_configuracion
         )
         self.btn_guardar.grid(row=4, column=0, columnspan=2, pady=30, padx=20)
 
-        # 1. Cargar datos del YAML inmediatamente
+        # 1. Load YAML data immediately
         self.cargar_configuracion()
         
-        # 2. ESCANEO SEGURO: Esperamos 500ms a que la UI esté viva antes de tocar el hardware
-        # Esto evita el Segmentation Fault en Arch Linux / Distrobox
+        # 2. SAFE SCAN: Wait 500ms for UI to boot before touching hardware
+        # This prevents Segmentation Faults in environments like Arch Linux / Distrobox
         self.after(500, self.actualizar_puertos)
 
     def crear_seccion_conexion(self, row):
         frame = ctk.CTkFrame(self)
         frame.grid(row=row, column=0, columnspan=2, pady=10, padx=20, sticky="ew")
         
-        ctk.CTkLabel(frame, text="🔌 Comunicación Serial", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
+        ctk.CTkLabel(frame, text="Serial Communication", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
         
         self.combo_puertos = ctk.CTkOptionMenu(
             frame, 
             variable=self.puerto_seleccionado, 
-            values=["Escaneando..."]
+            values=["Scanning..."]
         )
         self.combo_puertos.grid(row=1, column=0, pady=10, padx=20, sticky="w")
         
         btn_refresh = ctk.CTkButton(
             frame, 
-            text="🔄 REFRESCAR", 
+            text="REFRESH", 
             width=100, 
             command=self.actualizar_puertos
         )
         btn_refresh.grid(row=1, column=1, pady=10, padx=10)
 
     def actualizar_puertos(self):
-        """Escaneo de hardware con manejo de errores para evitar crasheos de memoria"""
+        """Hardware scan with error handling to prevent memory crashes"""
         try:
             puertos_raw = serial.tools.list_ports.comports()
             ports = [str(port.device) for port in puertos_raw]
             
             if not ports:
-                self.combo_puertos.configure(values=["No se detectan USB"])
-                self.puerto_seleccionado.set("No se detectan USB")
+                self.combo_puertos.configure(values=["No USB devices detected"])
+                self.puerto_seleccionado.set("No USB devices detected")
             else:
                 self.combo_puertos.configure(values=ports)
-                # Mantener el puerto actual si sigue conectado, si no, poner el primero
+                # Keep current port if still connected, otherwise set to the first available
                 actual = self.puerto_seleccionado.get()
                 if actual not in ports:
                     self.puerto_seleccionado.set(ports[0])
             
-            self.log("Puertos USB actualizados con éxito.")
+            self.log("USB ports updated successfully.")
         except Exception as e:
-            self.log(f"Fallo al escanear hardware: {e}", nivel="WARN")
+            self.log(f"Hardware scan failed: {e}", nivel="WARN")
             self.puerto_seleccionado.set("/dev/ttyUSB0")
 
     def crear_seccion_dimensiones(self, row):
         frame = ctk.CTkFrame(self)
         frame.grid(row=row, column=0, columnspan=2, pady=10, padx=20, sticky="ew")
         
-        ctk.CTkLabel(frame, text="📏 Geometría del Brazo (mm)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
+        ctk.CTkLabel(frame, text="Arm Geometry (mm)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
 
-        # Incluimos L4 para la punta del efector
+        # Keeping the backend keys intact to maintain YAML compatibility
         dimensiones = [
             ("Base (L1)", "altura_base"), 
-            ("Hombro (L2)", "brazo_superior"), 
-            ("Codo (L3)", "antebrazo"), 
-            ("Efector (L4)", "efector_final")
+            ("Shoulder (L2)", "brazo_superior"), 
+            ("Elbow (L3)", "antebrazo"), 
+            ("Effector (L4)", "efector_final")
         ]
         for i, (label, key) in enumerate(dimensiones):
             ctk.CTkLabel(frame, text=f"{label}:").grid(row=i+1, column=0, pady=5, padx=(20, 5), sticky="e")
@@ -109,7 +109,7 @@ class ConfigView(ctk.CTkScrollableFrame):
         frame = ctk.CTkFrame(self)
         frame.grid(row=row, column=0, columnspan=2, pady=10, padx=20, sticky="ew")
         
-        ctk.CTkLabel(frame, text="⚖️ Calibración de Servos (Offsets)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
+        ctk.CTkLabel(frame, text="Servo Calibration (Offsets)", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, pady=10, padx=10, sticky="w")
 
         articulaciones = [
             "joint_base_rotate", "joint_shoulder", "joint_elbow", 
@@ -125,45 +125,45 @@ class ConfigView(ctk.CTkScrollableFrame):
         config = self.config_manager.cargar()
         if not config: return
 
-        # Cargar puerto guardado
+        # Load saved port
         self.puerto_seleccionado.set(config.get("puerto_serial", "/dev/ttyUSB0"))
 
-        # Cargar dimensiones
+        # Load dimensions
         dims = config.get("dimensiones_brazo", {})
         for key, entry in self.entries_dim.items():
             entry.delete(0, "end")
             entry.insert(0, str(dims.get(key, 0.0)))
 
-        # Cargar offsets
+        # Load offsets
         arts = config.get("articulaciones", {})
         for key, entry in self.entries_offset.items():
             entry.delete(0, "end")
             datos_art = arts.get(key, {})
             entry.insert(0, str(datos_art.get("offset_grados", 0)))
             
-        self.log("Parámetros de hardware sincronizados.")
+        self.log("Hardware parameters synchronized.")
 
     def guardar_configuracion(self):
-        # Cargamos el estado actual para no perder campos extra (canales, etc)
+        # Load current state to preserve extra fields (channels, etc.)
         config = self.config_manager.cargar() or {"dimensiones_brazo": {}, "articulaciones": {}}
 
         try:
             config["puerto_serial"] = self.puerto_seleccionado.get()
             
-            # Actualizar dimensiones
+            # Update dimensions
             for key, entry in self.entries_dim.items():
                 config["dimensiones_brazo"][key] = float(entry.get())
 
-            # Actualizar articulaciones
+            # Update joints
             for key, entry in self.entries_offset.items():
                 if key not in config["articulaciones"]:
                     config["articulaciones"][key] = {"canal": 0, "offset_grados": 0}
                 config["articulaciones"][key]["offset_grados"] = float(entry.get())
 
             if self.config_manager.guardar(config):
-                self.log(f"Éxito: Configuración aplicada en {config['puerto_serial']}")
+                self.log(f"Success: Configuration applied on {config['puerto_serial']}")
             else:
-                self.log("Error crítico: No se pudo escribir en config_motores.yaml", nivel="ERROR")
+                self.log("Critical Error: Failed to write to config_motores.yaml", nivel="ERROR")
 
         except ValueError:
-            self.log("Error: Formato numérico inválido en dimensiones u offsets.", nivel="WARN")
+            self.log("Error: Invalid numeric format in dimensions or offsets.", nivel="WARN")

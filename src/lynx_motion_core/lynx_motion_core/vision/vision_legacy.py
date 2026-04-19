@@ -2,9 +2,8 @@ import cv2
 import numpy as np
 import time
 
-# ==========================================
-# BLOQUE 1: MOTOR LEGACY (El "Script Zero")
-# ==========================================
+# --- Legacy Engine ("Script Zero") ---
+
 class SketchExtractorLegacy:
     def __init__(self, config=None):
         self.cfg = config if config else {}
@@ -14,43 +13,37 @@ class SketchExtractorLegacy:
         
     def extract_features(self, image):
         """
-        Convierte la imagen en 'Line Art'.
-        Retorna la matriz estandarizada para el calculador de trayectoria.
+        Converts image to 'Line Art'.
+        Returns a standardized matrix for the trajectory calculator.
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         inv_gray = 255 - gray
         blur = cv2.GaussianBlur(inv_gray, (21, 21), 0)
         
-        # Color Dodge manual
-        def dodge(image, mask):
-            return cv2.divide(image, 255 - mask, scale=256)
+        def dodge(img, mask):
+            return cv2.divide(img, 255 - mask, scale=256)
         
         sketch = dodge(gray, blur)
         
-        # Binarización
         _, bin_sketch = cv2.threshold(sketch, 240, 255, cv2.THRESH_BINARY)
         edges = 255 - bin_sketch
         
-        # Adelgazamiento
         kernel = np.ones((2,2), np.uint8)
         edges = cv2.erode(edges, kernel, iterations=1)
         
-        # Extracción
         contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         
         rutas_estandarizadas = []
-        visual_debug = cv2.cvtColor(bin_sketch, cv2.COLOR_GRAY2BGR) 
+        visual_debug = cv2.cvtColor(bin_sketch, cv2.COLOR_GRAY2BGR)  
         
         for cnt in contours:
             if cv2.contourArea(cnt) < 20: continue
             
-            # ¡Aquí ya usabas la simplificación RDP que es vital para el robot!
+            # RDP simplification
             epsilon = 0.002 * cv2.arcLength(cnt, True)
             approx = cv2.approxPolyDP(cnt, epsilon, True)
             
             if len(approx) > 2:
-                # --- ADAPTACIÓN AL ESTÁNDAR DEL PROYECTO ---
-                # Convertimos el array de numpy a la lista de tuplas (x, y)
                 ruta_actual = []
                 for pt in approx.reshape(-1, 2):
                     ruta_actual.append((int(pt[0]), int(pt[1])))
@@ -62,26 +55,22 @@ class SketchExtractorLegacy:
 
         return rutas_estandarizadas, visual_debug
 
-# ==========================================
-# BLOQUE 2: MÓDULO EXPORTABLE (Caja Negra)
-# ==========================================
+# --- Exportable Module ---
+
 def obtener_trazos_legacy_alpha(usar_ui=True, cam_index=0):
     """
-    Función principal de la versión Alpha.
-    Retorna: (lista_de_coordenadas, imagen_generada_en_memoria)
+    Alpha version standalone extraction test.
+    Returns: paths, debug_image
     """
     extractor = SketchExtractorLegacy()
     cap = cv2.VideoCapture(cam_index)
 
-    # WARMUP DE CÁMARA
     if not usar_ui:
-        for _ in range(10):
-            cap.read()
-            time.sleep(0.05)
+        for _ in range(10): cap.read(); time.sleep(0.05)
 
     rutas_finales = []
     imagen_final = None
-    win_name = "Estilo Line Art (Legacy Alpha)"
+    win_name = "Line Art Style (Legacy Alpha)"
 
     while True:
         ret, frame = cap.read()
@@ -89,7 +78,6 @@ def obtener_trazos_legacy_alpha(usar_ui=True, cam_index=0):
         
         frame = cv2.flip(frame, 1)
         
-        # Procesamos la imagen con la clase antigua
         paths, view = extractor.extract_features(frame)
         imagen_final = view.copy()
 
@@ -97,10 +85,9 @@ def obtener_trazos_legacy_alpha(usar_ui=True, cam_index=0):
             rutas_finales = paths
             break
         else:
-            # Como este script no tenía trackbars, solo mostramos la info en pantalla
-            cv2.putText(view, f"Trazos Alpha: {len(paths)}", (10, 30), 
+            cv2.putText(view, f"Alpha Paths: {len(paths)}", (10, 30),  
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-            cv2.putText(view, "'T' -> Capturar y Vectorizar | 'Q' -> Salir", (10, 60), 
+            cv2.putText(view, "'t' -> Vectorize | 'q' -> Exit", (10, 60),  
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
             
             cv2.imshow(win_name, view)
@@ -113,20 +100,16 @@ def obtener_trazos_legacy_alpha(usar_ui=True, cam_index=0):
                 break
 
     cap.release()
-    if usar_ui:
-        cv2.destroyAllWindows()
+    if usar_ui: cv2.destroyAllWindows()
         
     return rutas_finales, imagen_final
 
-# ==========================================
-# PRUEBA DE UNIDAD LOCAL
-# ==========================================
 if __name__ == "__main__":
-    print("Iniciando módulo de visión (Legacy Alpha Sketch)...")
-    coordenadas, _ = obtener_trazos_legacy_alpha(usar_ui=True) 
+    print("Starting Vision Module (Legacy Alpha Sketch)...")
+    coordenadas, _ = obtener_trazos_legacy_alpha(usar_ui=True)  
     
     if coordenadas:
-        print(f"\n¡Éxito! Se obtuvieron {len(coordenadas)} líneas estilo dibujo manual.")
-        print(f"Muestra del primer trazo: {coordenadas[0][:3]}")
+        print(f"\nSuccess! Extracted {len(coordenadas)} line-art style paths.")
+        print(f"Sample of first path: {coordenadas[0][:3]}")
     else:
-        print("\nOperación cancelada.")
+        print("\nCancelled.")

@@ -1,3 +1,11 @@
+"""
+RViz Digital Twin Animator - SIG-Lynx
+
+Subscribes to trajectory commands and translates calculated Inverse Kinematics
+angles into URDF-compliant radians. Publishes JointState messages to drive
+the 3D visualization model in RViz smoothly.
+"""
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
@@ -12,28 +20,28 @@ class RVizAnimatorNode(Node):
     def __init__(self):
         super().__init__('rviz_animator_node')
         
-        # Publicador estándar que usa robot_state_publisher para mover el modelo
+        # Standard publisher using robot_state_publisher to move the model
         self.joint_pub = self.create_publisher(JointState, '/joint_states', 10)
         
-        # Escucha la orden de simular desde la UI
+        # Listens to simulation commands from UI
         self.sub = self.create_subscription(String, '/simular_trayectoria', self.simular_callback, 10)
         
-        # Tus medidas exactas
+        # Exact physical measurements
         self.L1, self.L2, self.L3, self.L4 = 115.0, 155.0, 185.0, 115.0
         
-        self.get_logger().info('🤖 Simulador RViz En Línea. Esperando coordenadas...')
+        self.get_logger().info('>>> RVIZ SIMULATOR ONLINE | Waiting for coordinates... <<<')
 
     def simular_callback(self, msg):
-        self.get_logger().info('Recibiendo datos. Renderizando animación 3D...')
+        self.get_logger().info('Receiving data. Rendering 3D animation...')
         puntos_3d = json.loads(msg.data)
         
         joint_state = JointState()
         joint_state.name = [
-            'joint_base_rotate', 
-            'joint_shoulder', 
-            'joint_elbow', 
-            'joint_wrist', 
-            'joint_gripper_rotate', 
+            'joint_base_rotate',  
+            'joint_shoulder',  
+            'joint_elbow',  
+            'joint_wrist',  
+            'joint_gripper_rotate',  
             'joint_gripper_finger',
             'joint_gripper_left_finger'
         ]
@@ -47,42 +55,46 @@ class RVizAnimatorNode(Node):
             angulos = calcular_ik(x, y, z, self.L1, self.L2, self.L3, self.L4)
             
             if angulos:
-                # TRADUCCIÓN A RADIANES PARA EL URDF
-                # El URDF de la base va de -PI a PI
+                # TRANSLATION TO RADIANS FOR URDF
+                # Base URDF range: -PI to PI
                 base_rad = math.radians(angulos[0])
                 
-                # El URDF del hombro espera 0 cuando está adelante, PI cuando está atrás
+                # Shoulder URDF expects 0 when forward, PI when backward
                 shoulder_rad = math.radians(angulos[1])
                 
-                # ¡DETALLE CLAVE! El URDF del codo tiene límite [-PI a 0]. 
-                # 0 es recto, negativo es doblado. Nuestra cinemática da 90 cuando está recto.
-                elbow_rad = math.radians(angulos[2] - 90.0) 
+                # KEY DETAIL: Elbow URDF has limits [-PI to 0].  
+                # 0 is straight, negative is bent. IK gives 90 when straight.
+                elbow_rad = math.radians(angulos[2] - 90.0)  
                 
                 wrist_rad = math.radians(angulos[3])
                 
                 joint_state.header.stamp = self.get_clock().now().to_msg()
                 joint_state.position = [
-                    base_rad, 
-                    shoulder_rad, 
-                    elbow_rad, 
-                    wrist_rad, 
-                    0.0, # Rotación de pinza fija
-                    0.0, # Pinza cerrada
+                    base_rad,  
+                    shoulder_rad,  
+                    elbow_rad,  
+                    wrist_rad,  
+                    0.0, # Fixed gripper rotation
+                    0.0, # Closed gripper
                     0.0
                 ]
                 
                 self.joint_pub.publish(joint_state)
-                # 30ms para que la animación en pantalla se vea fluida
-                time.sleep(0.03) 
+                # 30ms delay for smooth screen animation
+                time.sleep(0.03)  
                 
-        self.get_logger().info('Animación en RViz completada.')
+        self.get_logger().info('RViz animation completed.')
 
 def main(args=None):
     rclpy.init(args=args)
     node = RVizAnimatorNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

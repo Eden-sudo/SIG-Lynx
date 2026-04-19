@@ -4,12 +4,12 @@ import threading
 import time
 import subprocess
 import os
-import signal 
+import signal  
 
 from lynx_interfaces.srv import ProcesarVision, ProcesarCalculo, EjecutarMovimiento
 
 class RosClientNode(Node):
-    """Contenedor de los clientes de ROS 2"""
+    """Container for ROS 2 clients"""
     def __init__(self):
         super().__init__('ui_ros_client')
         self.cli_vision = self.create_client(ProcesarVision, 'procesar_imagen_vision')
@@ -17,25 +17,25 @@ class RosClientNode(Node):
         self.cli_movimiento = self.create_client(EjecutarMovimiento, 'ejecutar_movimiento_robot')
 
 class RosManager:
-    """Gestor de servicios de fondo, hilos y peticiones asíncronas"""
+    """Manager for background services, threads, and asynchronous requests"""
     def __init__(self):
-        # Diccionario para guardar los procesos vivos controlados por los switches
+        # Dictionary to store live processes controlled by switches
         self.procesos_activos = {}
         
-        # Inicializar ROS 2 y el Nodo Cliente
+        # Initialize ROS 2 and Client Node
         rclpy.init(args=None)
         self.node = RosClientNode()
         
-        # Hilo para mantener ROS vivo sin bloquear la UI
+        # Thread to keep ROS alive without blocking the UI
         self.spin_thread = threading.Thread(target=self._spin, daemon=True)
         self.spin_thread.start()
 
     # ==========================================
-    # GESTIÓN DINÁMICA DE PROCESOS (Para los Switches)
+    # DYNAMIC PROCESS MANAGEMENT (For Switches)
     # ==========================================
     
     def alternar_proceso(self, nombre_proceso, encender, logger_func):
-        """Enciende o apaga un servicio de ROS 2 según el estado del switch"""
+        """Turns a ROS 2 service on or off based on switch state"""
         
         comandos = {
             "vision": "ros2 run lynx_motion_core vision_service",
@@ -47,45 +47,45 @@ class RosManager:
 
         if encender:
             if nombre_proceso not in self.procesos_activos and nombre_proceso in comandos:
-                logger_func(f"[{nombre_proceso.upper()}] Iniciando servicio...")
+                logger_func(f"[{nombre_proceso.upper()}] Starting service...")
                 
-                # ¡CORRECCIÓN CRÍTICA!: Quitamos DEVNULL. 
-                # Ahora hereda la terminal principal, por lo que verás los errores de ROS 2
+                # CRITICAL FIX: Removed DEVNULL.  
+                # Now it inherits the main terminal, allowing ROS 2 errors to be visible.
                 p = subprocess.Popen(
-                    ["bash", "-c", comandos[nombre_proceso]], 
+                    ["bash", "-c", comandos[nombre_proceso]],  
                     preexec_fn=os.setsid
                 )
                 self.procesos_activos[nombre_proceso] = p
-                logger_func(f"[{nombre_proceso.upper()}] EN LÍNEA (PID: {p.pid}).")
+                logger_func(f"[{nombre_proceso.upper()}] ONLINE (PID: {p.pid}).")
         else:
             if nombre_proceso in self.procesos_activos:
-                logger_func(f"[{nombre_proceso.upper()}] Apagando servicio...")
+                logger_func(f"[{nombre_proceso.upper()}] Shutting down service...")
                 p = self.procesos_activos.pop(nombre_proceso)
                 try:
                     os.killpg(os.getpgid(p.pid), signal.SIGTERM)
                 except ProcessLookupError:
                     pass
-                logger_func(f"[{nombre_proceso.upper()}] DESCONECTADO.")
+                logger_func(f"[{nombre_proceso.upper()}] OFFLINE.")
 
     def _spin(self):
         rclpy.spin(self.node)
 
     def detener(self):
-        """Apaga los servicios vivos y cierra ROS de forma limpia al salir"""
-        print("[ROS Manager] Cerrando servicios y limpiando procesos...")
+        """Shuts down live services and closes ROS cleanly on exit"""
+        print("[ROS Manager] Closing services and cleaning up processes...")
         for nombre in list(self.procesos_activos.keys()):
             self.alternar_proceso(nombre, False, print)
         self.node.destroy_node()
         rclpy.shutdown()
 
     # ==========================================
-    # METODOS DE LLAMADA (Para ser usados por la UI)
+    # CALL METHODS (To be used by the UI)
     # ==========================================
     
     def solicitar_vision(self, ruta_imagen, script_id, callback):
         def _task():
             if not self.node.cli_vision.wait_for_service(timeout_sec=5.0):
-                print("[ROS Manager] Error: El servicio de vision no responde.")
+                print("[ROS Manager] Error: Vision service is not responding.")
                 callback(None)
                 return
 
@@ -103,7 +103,7 @@ class RosManager:
     def solicitar_calculo(self, rutas_json, config_espacio_json, w_img, h_img, delta_paso, callback):
         def _task():
             if not self.node.cli_calculo.wait_for_service(timeout_sec=5.0):
-                print("[ROS Manager] Error: El servicio de calculo no responde.")
+                print("[ROS Manager] Error: Calculus service is not responding.")
                 callback(None)
                 return
 
@@ -124,7 +124,7 @@ class RosManager:
     def solicitar_movimiento(self, matriz_json, callback):
         def _task():
             if not self.node.cli_movimiento.wait_for_service(timeout_sec=5.0):
-                print("[ROS Manager] Error critico: El hardware AL5D no responde.")
+                print("[ROS Manager] Critical Error: AL5D hardware is not responding.")
                 callback(None)
                 return
 
@@ -150,7 +150,7 @@ class RosManager:
             msg.data = matriz_json
             self.sim_pub.publish(msg)
             
-            time.sleep(0.5) 
+            time.sleep(0.5)  
             callback({"success": True})
             
         threading.Thread(target=_task, daemon=True).start()

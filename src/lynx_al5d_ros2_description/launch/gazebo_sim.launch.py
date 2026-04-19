@@ -1,3 +1,9 @@
+"""
+Gazebo Simulation Launch File - SIG-Lynx
+
+Spawns the AL5D URDF model into a Gazebo physics simulation environment,
+initializing the necessary joint state broadcasters and arm controllers.
+"""
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -8,18 +14,16 @@ from launch_ros.actions import Node
 import xacro
 
 def generate_launch_description():
-    pkg_name = 'lynx_al5d_ros2_description'
-    pkg_share = get_package_share_directory(pkg_name)
+    pkg_share = get_package_share_directory('lynx_al5d_ros2_description')
     
-    # 1. Configurar rutas para modelos (evita mallas invisibles)
-    gazebo_model_path = os.path.join(pkg_share, '..')
-    os.environ["GAZEBO_MODEL_PATH"] = gazebo_model_path
+    # Configure model paths to prevent invisible meshes in Gazebo
+    os.environ["GAZEBO_MODEL_PATH"] = os.path.join(pkg_share, '..')
 
-    # 2. Procesar el URDF/Xacro
+    # Process URDF/Xacro
     xacro_file = os.path.join(pkg_share, 'urdf', 'lynx_al5d.urdf.xacro')
     robot_description_config = xacro.process_file(xacro_file).toxml()
 
-    # 3. Nodo Robot State Publisher (Publica TF basado en la simulación)
+    # Robot State Publisher (Publishes TF based on simulation)
     node_robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -27,15 +31,14 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description_config, 'use_sim_time': True}]
     )
 
-    # 4. Lanzar Gazebo
-    # Truco para tu laptop: Si quieres ahorrar recursos, puedes cambiar 'gui': True a False
-    # y solo verás el robot en RViz, pero la física correrá de fondo.
+    # Launch Gazebo
+    # Note: To save hardware resources, 'gui' can be set to False inside gazebo.launch.py
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')]),
     )
 
-    # 5. Spawn del robot en Gazebo
+    # Spawn robot entity in Gazebo
     spawn_entity = Node(
         package='gazebo_ros', 
         executable='spawn_entity.py',
@@ -43,23 +46,22 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 6. ACTIVAR CONTROLADORES
-    # Carga el publicador de estados (lee los encoders simulados)
+    # Initialize Joint State Broadcaster (Reads simulated encoders)
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
     )
 
-    # Carga el controlador del brazo (recibe comandos de posición)
+    # Initialize Arm Controller (Receives position commands)
     arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["arm_controller", "--controller-manager", "/controller_manager"],
     )
 
-    # Retrasar la carga de controladores hasta que el robot haya aparecido (Spawn)
-    # Esto evita errores de "Controller manager not found" al inicio
+    # Delay controller loading until robot entity is completely spawned
+    # Prevents "Controller manager not found" initialization errors
     return LaunchDescription([
         gazebo,
         node_robot_state_publisher,

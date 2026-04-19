@@ -6,12 +6,12 @@ from endpoints import router
 
 app = FastAPI(title="SIG-Lynx Server")
 
-# Configuración de carpetas
+# Folder Configuration
 UPLOAD_FOLDER = "uploads"
 WEB_FOLDER = "web"
 ASSETS_FOLDER = os.path.join(WEB_FOLDER, "assets")
 
-# Asegurar carpetas
+# Ensure directories exist
 for folder in [UPLOAD_FOLDER, WEB_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
@@ -24,14 +24,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Montar carpetas estáticas
+# Mount static directories
 app.mount("/web", StaticFiles(directory=WEB_FOLDER), name="web")
-app.mount("/assets", StaticFiles(directory=ASSETS_FOLDER), name="assets")
+if os.path.exists(ASSETS_FOLDER):
+    app.mount("/assets", StaticFiles(directory=ASSETS_FOLDER), name="assets")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 
 app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    # reload=False es más estable para aplicaciones que usan rclpy y hilos
+    # reload=False is safer for applications utilizing rclpy and background threads
+    print("[SERVER] Launching SIG-Lynx Web Interface on port 8000...")
     uvicorn.run("launch_server:app", host="0.0.0.0", port=8000, reload=False)
