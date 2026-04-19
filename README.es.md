@@ -66,6 +66,6 @@ Para iniciar el dashboard web de FastAPI:
 Para información detallada sobre la derivación matemática de la Cinemática Inversa y las integrales de convolución utilizadas en el pipeline de visión, por favor consulte el informe interno ubicado en la carpeta de documentación del proyecto.
 
 ## Autores
-* **Carlos Duarte** - Desarrollador Principal e Ingeniería Mecatrónica
+* **Carlos Duarte** - Desarrollador Principal
 * **Equipo del Proyecto**: Bryan Mendez, Carla Moran, Vladimir Campos.
 * **Institución**: Universidad Latina de Panamá.
